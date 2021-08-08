@@ -1,4 +1,4 @@
-# stacked_hourglass.paddle
+# stacked-hourglass.paddle
 Paddlepaddle implementation of "[Stacked Hourglass Networks for Human Pose Estimation](https://arxiv.org/abs/1603.06937)"
 
 ## Baidu Ai Studio paper reproduce requirements
