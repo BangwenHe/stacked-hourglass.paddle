@@ -14,8 +14,8 @@ import random
 
 import cv2
 import numpy as np
-import torch
-from torch.utils.data import Dataset
+import paddle
+from paddle.io import Dataset
 
 from lib.utils.transforms import get_affine_transform
 from lib.utils.transforms import affine_transform
@@ -180,8 +180,8 @@ class JointsDataset(Dataset):
 
         target, target_weight = self.generate_target(joints, joints_vis)
 
-        target = torch.from_numpy(target)
-        target_weight = torch.from_numpy(target_weight)
+        target = paddle.to_tensor(target)
+        target_weight = paddle.to_tensor(target_weight)
 
         meta = {
             'image': image_file,

@@ -179,3 +179,7 @@ class MPIIDataset(JointsDataset):
         name_value = OrderedDict(name_value)
 
         return name_value, name_value['Mean']
+
+
+if __name__ == '__main__':
+    from lib.config import cfg
