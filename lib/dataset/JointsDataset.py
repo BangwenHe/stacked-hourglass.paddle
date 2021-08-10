@@ -26,7 +26,26 @@ logger = logging.getLogger(__name__)
 
 
 class JointsDataset(Dataset):
-    def __init__(self, cfg, root, image_set, is_train, transform=None):
+    def __init__(self,
+                 root,
+                 image_set,
+                 is_train,
+                 transform=None,
+                 output_path='output',
+                 data_format='jpg',
+                 scale_factor=0.25,
+                 rotation_factor=30,
+                 flip=True,
+                 num_joints_half_body=8,
+                 prob_half_body=-1,
+                 color_rgb=True,
+                 target_type='gaussian',
+                 image_size=256,
+                 heatmap_size=256,
+                 sigma=2,
+                 use_different_joints_weight=False,
+                 ):
+        super().__init__()
         self.num_joints = 0
         self.pixel_std = 200
         self.flip_pairs = []
@@ -36,21 +55,21 @@ class JointsDataset(Dataset):
         self.root = root
         self.image_set = image_set
 
-        self.output_path = cfg.OUTPUT_DIR
-        self.data_format = cfg.DATASET.DATA_FORMAT
+        self.output_path = output_path
+        self.data_format = data_format
 
-        self.scale_factor = cfg.DATASET.SCALE_FACTOR
-        self.rotation_factor = cfg.DATASET.ROT_FACTOR
-        self.flip = cfg.DATASET.FLIP
-        self.num_joints_half_body = cfg.DATASET.NUM_JOINTS_HALF_BODY
-        self.prob_half_body = cfg.DATASET.PROB_HALF_BODY
-        self.color_rgb = cfg.DATASET.COLOR_RGB
+        self.scale_factor = scale_factor
+        self.rotation_factor = rotation_factor
+        self.flip = flip
+        self.num_joints_half_body = num_joints_half_body
+        self.prob_half_body = prob_half_body
+        self.color_rgb = color_rgb
 
-        self.target_type = cfg.MODEL.TARGET_TYPE
-        self.image_size = np.array(cfg.MODEL.IMAGE_SIZE)
-        self.heatmap_size = np.array(cfg.MODEL.HEATMAP_SIZE)
-        self.sigma = cfg.MODEL.SIGMA
-        self.use_different_joints_weight = cfg.LOSS.USE_DIFFERENT_JOINTS_WEIGHT
+        self.target_type = target_type
+        self.image_size = np.array([image_size, image_size]) if type(image_size) == int else image_size
+        self.heatmap_size = np.array([heatmap_size, heatmap_size]) if type(heatmap_size) == int else heatmap_size
+        self.sigma = sigma
+        self.use_different_joints_weight = use_different_joints_weight
         self.joints_weight = 1
 
         self.transform = transform

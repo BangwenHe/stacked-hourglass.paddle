@@ -14,6 +14,7 @@ import json
 from collections import OrderedDict
 
 import numpy as np
+import paddle.vision.transforms
 from scipy.io import loadmat, savemat
 
 from lib.dataset.JointsDataset import JointsDataset
@@ -23,8 +24,13 @@ logger = logging.getLogger(__name__)
 
 
 class MPIIDataset(JointsDataset):
-    def __init__(self, cfg, root, image_set, is_train, transform=None):
-        super().__init__(cfg, root, image_set, is_train, transform)
+    def __init__(self, root, image_set, is_train, transform=None, output_path='output', data_format='jpg',
+                 scale_factor=0.25, rotation_factor=30, flip=True, num_joints_half_body=8, prob_half_body=-1,
+                 color_rgb=True, target_type='gaussian', image_size=256, heatmap_size=256, sigma=2,
+                 use_different_joints_weight=False, select_train_data=False, test_set='valid'):
+        super().__init__(root, image_set, is_train, transform, output_path, data_format, scale_factor, rotation_factor,
+                         flip, num_joints_half_body, prob_half_body, color_rgb, target_type, image_size, heatmap_size,
+                         sigma, use_different_joints_weight)
 
         self.num_joints = 16
         self.flip_pairs = [[0, 5], [1, 4], [2, 3], [10, 15], [11, 14], [12, 13]]
@@ -34,8 +40,10 @@ class MPIIDataset(JointsDataset):
         self.lower_body_ids = (0, 1, 2, 3, 4, 5, 6)
 
         self.db = self._get_db()
+        self.select_train_data = select_train_data
+        self.test_set = test_set
 
-        if is_train and cfg.DATASET.SELECT_DATA:
+        if is_train and self.select_train_data:
             self.db = self.select_data(self.db)
 
         logger.info('=> load {} samples'.format(len(self.db)))
@@ -93,7 +101,7 @@ class MPIIDataset(JointsDataset):
 
         return gt_db
 
-    def evaluate(self, cfg, preds, output_dir, *args, **kwargs):
+    def evaluate(self, preds, output_dir, *args, **kwargs):
         # convert 0-based index to 1-based index
         preds = preds[:, :, 0:2] + 1.0
 
@@ -101,15 +109,15 @@ class MPIIDataset(JointsDataset):
             pred_file = os.path.join(output_dir, 'pred.mat')
             savemat(pred_file, mdict={'preds': preds})
 
-        if 'test' in cfg.DATASET.TEST_SET:
+        if 'test' in self.test_set:
             return {'Null': 0.0}, 0.0
 
         SC_BIAS = 0.6
         threshold = 0.5
 
-        gt_file = os.path.join(cfg.DATASET.ROOT,
+        gt_file = os.path.join(self.root,
                                'annot',
-                               'gt_{}.mat'.format(cfg.DATASET.TEST_SET))
+                               'gt_{}.mat'.format(self.test_set))
         gt_dict = loadmat(gt_file)
         dataset_joints = gt_dict['dataset_joints']
         jnt_missing = gt_dict['jnt_missing']
@@ -182,4 +190,18 @@ class MPIIDataset(JointsDataset):
 
 
 if __name__ == '__main__':
-    from lib.config import cfg
+    from paddle.io import DataLoader
+
+    transform = paddle.vision.transforms.Compose([
+        paddle.vision.transforms.ToTensor(),
+        paddle.vision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    dataset = MPIIDataset(root='D:/Dataset/MPII', image_set='valid', is_train=False, transform=transform)
+    print(len(dataset))
+    dataloader = DataLoader(dataset, batch_size=4, num_workers=4)
+
+    for idx, (images, target, target_weight, meta) in enumerate(dataloader):
+        if idx > 0:
+            break
+
+        print(idx, images.shape, target.shape)
