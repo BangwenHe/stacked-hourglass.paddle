@@ -6,9 +6,9 @@ import paddle.nn.functional as F
 class ResidualModule(nn.Layer):
     def __init__(self, in_channels=256):
         super().__init__()
-        self.bn = nn.BatchNorm2D(num_features=in_channels)
+        self.bn = nn.BatchNorm(num_channels=in_channels)
         self.conv1 = nn.Conv2D(in_channels=in_channels, out_channels=128, kernel_size=1)
-        self.conv2 = nn.Conv2D(in_channels=128, out_channels=128, kernel_size=3)
+        self.conv2 = nn.Conv2D(in_channels=128, out_channels=128, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2D(in_channels=128, out_channels=in_channels, kernel_size=1)
 
     def forward(self, x):
@@ -24,16 +24,16 @@ class HourglassModule(nn.Layer):
         # hourglass模块的shape保证为(N, 64, 64, 256)
         # TODO: 这个操作挺奇葩
         super().__init__()
-        self.downsamples = nn.Sequential(
-            *[(f'down_{i}', ResidualModule()) for i in range(4)]
+        self.downsamples = nn.LayerList(
+            [ResidualModule() for _ in range(4)]
         )
 
-        self.keeps = nn.Sequential(
-            *[(f'keep_{i}', ResidualModule()) for i in range(4)]
+        self.keeps = nn.LayerList(
+            [ResidualModule() for _ in range(4)]
         )
 
         self.low = nn.Sequential(
-            *[(f'low_{i}', ResidualModule()) for i in range(3)]
+            *[ResidualModule() for _ in range(3)]
         )
 
     def forward(self, x):
@@ -50,7 +50,7 @@ class HourglassModule(nn.Layer):
 
         # 4 -> 8 -> 16 -> 32 -> 64
         for feat in temp[::-1]:
-            x = F.upsample(x, size=(2, 2), mode='nearest')
+            x = F.upsample(x, size=feat.shape[-2:], mode='nearest')
             x = x + feat
 
         return x
@@ -58,7 +58,9 @@ class HourglassModule(nn.Layer):
 
 if __name__ == '__main__':
     hg = HourglassModule()
+    print(hg)
 
-    x = paddle.randn((4, 3, 256, 256))
+    x = paddle.randn((4, 256, 64, 64))
     y = hg(x)
     print(y.shape)
+    print(y[0, 0])
