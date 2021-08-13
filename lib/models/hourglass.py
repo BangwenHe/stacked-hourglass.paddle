@@ -58,7 +58,7 @@ class HourglassModule(nn.Layer):
 
 
 class Hourglass(nn.Layer):
-    def __init__(self, num_modules=4, img_size=256, feat_size=64, num_channels=256, num_joints=17):
+    def __init__(self, num_modules=4, img_size=256, feat_size=64, num_channels=256, num_joints=16):
         super().__init__()
 
         # 堆叠的hourglass模块的数量

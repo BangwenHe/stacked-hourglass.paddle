@@ -41,7 +41,7 @@ class JointsDataset(Dataset):
                  color_rgb=True,
                  target_type='gaussian',
                  image_size=256,
-                 heatmap_size=256,
+                 heatmap_size=64,
                  sigma=2,
                  use_different_joints_weight=False,
                  ):

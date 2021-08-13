@@ -46,14 +46,14 @@ def get_max_preds(batch_heatmaps):
     return preds, maxvals
 
 
-def get_final_preds(config, batch_heatmaps, center, scale):
+def get_final_preds(batch_heatmaps, center, scale):
     coords, maxvals = get_max_preds(batch_heatmaps)
 
     heatmap_height = batch_heatmaps.shape[2]
     heatmap_width = batch_heatmaps.shape[3]
 
     # post-processing
-    if config.TEST.POST_PROCESS:
+    if True:
         for n in range(coords.shape[0]):
             for p in range(coords.shape[1]):
                 hm = batch_heatmaps[n][p]

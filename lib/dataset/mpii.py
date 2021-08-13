@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class MPIIDataset(JointsDataset):
     def __init__(self, root, image_set, is_train, transform=None, output_path='output', data_format='jpg',
                  scale_factor=0.25, rotation_factor=30, flip=True, num_joints_half_body=8, prob_half_body=-1,
-                 color_rgb=True, target_type='gaussian', image_size=256, heatmap_size=256, sigma=2,
+                 color_rgb=True, target_type='gaussian', image_size=256, heatmap_size=64, sigma=2,
                  use_different_joints_weight=False, select_train_data=False, test_set='valid'):
         super().__init__(root, image_set, is_train, transform, output_path, data_format, scale_factor, rotation_factor,
                          flip, num_joints_half_body, prob_half_body, color_rgb, target_type, image_size, heatmap_size,
