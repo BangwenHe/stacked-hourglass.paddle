@@ -14,9 +14,9 @@ import time
 from collections import namedtuple
 from pathlib import Path
 
-import torch
-import torch.optim as optim
-import torch.nn as nn
+import paddle
+import paddle.optimizer as optimizer
+import paddle.nn as nn
 
 
 def create_logger(cfg, cfg_name, phase='train'):
@@ -60,7 +60,7 @@ def create_logger(cfg, cfg_name, phase='train'):
 def get_optimizer(cfg, model):
     optimizer = None
     if cfg.TRAIN.OPTIMIZER == 'sgd':
-        optimizer = optim.SGD(
+        optimizer = paddle.optimizer.SGD(
             model.parameters(),
             lr=cfg.TRAIN.LR,
             momentum=cfg.TRAIN.MOMENTUM,

@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 def train(train_loader, model, criterion, optimizer, epoch,
-          output_dir, print_freq=3):
+          output_dir, print_freq=20):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -42,8 +42,8 @@ def train(train_loader, model, criterion, optimizer, epoch,
         # compute output
         outputs = model(input)
 
-        # target = target.cuda(non_blocking=True)
-        # target_weight = target_weight.cuda(non_blocking=True)
+        target = target.cuda(blocking=False)
+        target_weight = target_weight.cuda(blocking=False)
 
         if isinstance(outputs, list):
             loss = criterion(outputs[0], target, target_weight)
@@ -81,7 +81,7 @@ def train(train_loader, model, criterion, optimizer, epoch,
                       epoch, i, len(train_loader), batch_time=batch_time,
                       speed=input.shape[0]/batch_time.val,
                       data_time=data_time, loss=losses, acc=acc)
-            logger.info(msg)
+            print(msg)
 
             # writer = writer_dict['writer']
             # global_steps = writer_dict['train_global_steps']
@@ -94,7 +94,7 @@ def train(train_loader, model, criterion, optimizer, epoch,
             #                   prefix)
 
 
-def validate(val_loader, val_dataset, model, criterion, output_dir):
+def validate(val_loader, val_dataset, model, criterion, output_dir, print_freq=20):
     batch_time = AverageMeter()
     losses = AverageMeter()
     acc = AverageMeter()
@@ -104,7 +104,7 @@ def validate(val_loader, val_dataset, model, criterion, output_dir):
 
     num_samples = len(val_dataset)
     all_preds = np.zeros(
-        (num_samples, 17, 3),
+        (num_samples, 16, 3),
         dtype=np.float32
     )
 
@@ -144,12 +144,12 @@ def validate(val_loader, val_dataset, model, criterion, output_dir):
 
                 output = (output + output_flipped) * 0.5
 
-            target = target.cuda(non_blocking=True)
-            target_weight = target_weight.cuda(non_blocking=True)
+            target = target.cuda(blocking=False)
+            target_weight = target_weight.cuda(blocking=False)
 
             loss = criterion(output, target, target_weight)
 
-            num_images = input.size(0)
+            num_images = input.shape[0]
             # measure accuracy and record loss
             losses.update(loss.item(), num_images)
             _, avg_acc, cnt, pred = accuracy(output.cpu().numpy(),
@@ -179,7 +179,7 @@ def validate(val_loader, val_dataset, model, criterion, output_dir):
 
             idx += num_images
 
-            if i % 100 == 0:
+            if i % print_freq == 0:
                 msg = 'Test: [{0}/{1}]\t' \
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t' \
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t' \
@@ -198,6 +198,8 @@ def validate(val_loader, val_dataset, model, criterion, output_dir):
             all_preds, output_dir, all_boxes, image_path,
             filenames, imgnums
         )
+        print(name_values)
+        print(perf_indicator)
 
         model_name = 'hourglass'
         if isinstance(name_values, list):
