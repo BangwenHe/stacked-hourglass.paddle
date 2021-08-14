@@ -3,37 +3,57 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+# 参考: https://zhuanlan.zhihu.com/p/45002720
+
 
 class ResidualModule(nn.Layer):
-    def __init__(self, in_channels=256):
+    """
+    https://github.com/princeton-vl/pose-hg-train/blob/master/src/models/layers/Residual.lua
+    顺序: (bn -> relu -> conv) * 3 + conv
+    """
+    def __init__(self, in_channels=256, out_channels=256):
         super().__init__()
-        self.bn = nn.BatchNorm(num_channels=in_channels)
-        self.conv1 = nn.Conv2D(in_channels=in_channels, out_channels=128, kernel_size=1)
-        self.conv2 = nn.Conv2D(in_channels=128, out_channels=128, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2D(in_channels=128, out_channels=in_channels, kernel_size=1)
+        self.bn1 = nn.BatchNorm(num_channels=in_channels)
+        self.conv1 = nn.Conv2D(in_channels=in_channels, out_channels=out_channels//2, kernel_size=1)
+
+        self.bn2 = nn.BatchNorm(num_channels=out_channels//2)
+        self.conv2 = nn.Conv2D(in_channels=out_channels//2, out_channels=out_channels//2, kernel_size=3, padding=1)
+
+        self.bn3 = nn.BatchNorm(num_channels=out_channels//2)
+        self.conv3 = nn.Conv2D(in_channels=out_channels//2, out_channels=out_channels, kernel_size=1)
+
+        self.conv_res = nn.Conv2D(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
 
     def forward(self, x):
-        y = F.relu(self.bn(x))
-        y = F.relu(self.conv1(y))
-        y = F.relu(self.conv2(y))
-        y = self.conv3(y)
+        y = self.conv1(F.relu(self.bn1(x)))
+        y = self.conv2(F.relu(self.bn2(y)))
+        y = self.conv3(F.relu(self.bn3(y)))
+
+        x = self.conv_res(x)
         return x + y
 
 
 class HourglassModule(nn.Layer):
-    def __init__(self, heatmap_size=64, in_channels=256):
+    """
+    https://github.com/princeton-vl/pose-hg-train/blob/master/src/models/hg.lua
+    原作者使用的是递归的方式来定义hourglass模块
+    """
+    def __init__(self, num_layers=4, heatmap_size=64, in_channels=256):
         # hourglass模块的shape保证为(N, 256, 64, 64)
         super().__init__()
+        self.heatmap_size = heatmap_size
         self.downsamples = nn.LayerList(
-            [ResidualModule() for _ in range(4)]
+            [ResidualModule(in_channels) for _ in range(num_layers)]
         )
 
         self.keeps = nn.LayerList(
-            [ResidualModule() for _ in range(4)]
+            [ResidualModule(in_channels) for _ in range(num_layers)]
         )
 
-        self.low = nn.Sequential(
-            *[ResidualModule() for _ in range(3)]
+        self.low = nn.Conv2D(kernel_size=1, in_channels=in_channels, out_channels=in_channels)
+
+        self.upsamples = nn.LayerList(
+            [ResidualModule(in_channels) for _ in range(num_layers)]
         )
 
     def forward(self, x):
@@ -41,15 +61,16 @@ class HourglassModule(nn.Layer):
 
         # 64 -> 32 -> 16 -> 8 -> 4
         for down, keep in zip(self.downsamples, self.keeps):
-            x = down(x)
             temp.append(keep(x))
             x = F.max_pool2d(x, kernel_size=(2, 2), stride=2)
+            x = down(x)
 
         # 4x4
         x = self.low(x)
 
         # 4 -> 8 -> 16 -> 32 -> 64
-        for feat in temp[::-1]:
+        for up, feat in zip(self.upsamples, temp[::-1]):
+            x = up(x)
             x = F.upsample(x, size=feat.shape[-2:], mode='nearest')
             x = x + feat
 
@@ -73,17 +94,26 @@ class Hourglass(nn.Layer):
 
         # 对256的图像进行降采样
         self.down_sample = nn.Sequential(
-            nn.Conv2D(kernel_size=7, stride=2, padding=3, in_channels=3, out_channels=num_channels),
-            ResidualModule(in_channels=num_channels),
-            nn.MaxPool2D(kernel_size=2, stride=2)
+            nn.Conv2D(kernel_size=7, stride=2, padding=3, in_channels=3, out_channels=num_channels // 4),
+            nn.BatchNorm(num_channels=num_channels // 4),
+            nn.ReLU(),
+            ResidualModule(in_channels=num_channels // 4, out_channels=num_channels // 2),
+            nn.MaxPool2D(kernel_size=2, stride=2),
+            ResidualModule(in_channels=num_channels // 2, out_channels=num_channels // 2),
+            ResidualModule(in_channels=num_channels // 2, out_channels=num_channels)
         )
 
         self.hourglass_modules = nn.LayerList()
         for i in range(self.num_modules):
             module = nn.Sequential(
                 ('hourglass_module', HourglassModule()),
+                ('res', ResidualModule()),
+                ('conv', nn.Sequential(
+                    nn.Conv2D(kernel_size=1, in_channels=self.num_channels, out_channels=self.num_channels),
+                    nn.BatchNorm(num_channels=self.num_channels),
+                    nn.ReLU())),
                 ('remap_joints', nn.Conv2D(kernel_size=1, in_channels=self.num_channels, out_channels=self.num_joints)),
-                ('remap_channels_1', nn.Conv2D(kernel_size=1, in_channels=self.num_joints, out_channels=self.num_channels)),
+                ('remap_channels_1', nn.Conv2D(kernel_size=1, in_channels=self.num_channels, out_channels=self.num_channels)),
                 ('remap_channels_2', nn.Conv2D(kernel_size=1, in_channels=self.num_joints, out_channels=self.num_channels))
             )
 
@@ -95,17 +125,24 @@ class Hourglass(nn.Layer):
 
         for idx, m in enumerate(self.hourglass_modules):
             _hg = m['hourglass_module']
+            res = m['res']
+            conv = m['conv']
             rj = m['remap_joints']
             r1 = m['remap_channels_1']
             r2 = m['remap_channels_2']
+
             y = _hg(x)
-            y = rj(y)
-            output.append(y)
+            y = res(y)
+            y = conv(y)
 
-            y1 = r1(y)
-            y2 = r2(y)
+            out = rj(y)
+            output.append(out)
 
-            x = x + y1 + y2
+            if idx < self.num_modules - 1:
+                y1 = r1(y)
+                y2 = r2(out)
+
+                x = x + y1 + y2
 
         return output
 
@@ -121,6 +158,7 @@ class Hourglass(nn.Layer):
 
 
 if __name__ == '__main__':
+    # hourglass network测试
     hg = Hourglass()
     hg.init_weight()
     print(hg)
@@ -129,4 +167,12 @@ if __name__ == '__main__':
     y = hg(x)
     print(y[0].shape, y[1].shape)
 
-    paddle.save(hg.state_dict(), 'hg.pdparams')
+    # paddle.save(hg.state_dict(), 'hg.pdparams')
+
+    # hourglass module 测试
+    # hg = HourglassModule()
+    # print(hg)
+    #
+    # x = paddle.randn((4, 256, 64, 64))
+    # y = hg(x)
+    # print(y.shape)
