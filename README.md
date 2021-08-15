@@ -17,6 +17,8 @@
 
 [MPII Human Pose Dataset](http://human-pose.mpi-inf.mpg.de/#download)
 
+MPII标注信息来自[HRNet](https://github.com/leoxiaobin/deep-high-resolution-net.pytorch)
+
 ## 四、环境依赖
 
 见[requirements.txt](requirements.txt)，推荐使用百度源（https://mirror.baidu.com/pypi/simple）进行安装。
