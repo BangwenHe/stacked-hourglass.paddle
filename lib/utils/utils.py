@@ -9,7 +9,6 @@ import logging
 import time
 
 import paddle
-import paddle.nn as nn
 
 from lib.config import Config
 
@@ -40,3 +39,17 @@ def save_checkpoint(states, is_best, output_dir, filename='checkpoint.pdparams')
     paddle.save(states, os.path.join(output_dir, filename))
     if is_best and 'state_dict' in states:
         paddle.save(states['state_dict'], os.path.join(output_dir, 'best.pdparams'))
+
+
+def model_parameters(model, inputs=(1, 3, 256, 256)):
+    import paddleslim
+    flops = paddleslim.flops(model, inputs)
+    params = paddle.summary(model, inputs)
+    print(params)
+
+    cnt = 0
+    while flops > 1024:
+        flops /= 1024
+        cnt += 1
+    suffix = ['flops', 'K flops', 'M flops', 'G flops', 'T flops']
+    print(f'model float operating per second: {flops:.2f}{suffix[cnt]}')

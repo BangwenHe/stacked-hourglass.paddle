@@ -18,14 +18,12 @@ import paddle
 from lib.core.evaluate import accuracy
 from lib.core.inference import get_final_preds
 from lib.utils.transforms import flip_back
-# from lib.utils.vis import save_debug_images
-
+from lib.utils.vis import save_debug_images
 
 logger = logging.getLogger(__name__)
 
 
-def train(train_loader, model, criterion, optimizer, epoch,
-          output_dir, print_freq=20):
+def train(train_loader, model, criterion, optimizer, epoch, debug_dir, print_freq):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -33,6 +31,7 @@ def train(train_loader, model, criterion, optimizer, epoch,
 
     # switch to train mode
     model.train()
+    n = len(train_loader)
 
     end = time.time()
     for i, (input, target, target_weight, meta) in enumerate(train_loader):
@@ -71,7 +70,7 @@ def train(train_loader, model, criterion, optimizer, epoch,
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % print_freq == 0:
+        if i % print_freq == 0 or i == n - 1:
             msg = 'Epoch: [{0}][{1}/{2}]\t' \
                   'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
                   'Speed {speed:.1f} samples/s\t' \
@@ -83,28 +82,22 @@ def train(train_loader, model, criterion, optimizer, epoch,
                       data_time=data_time, loss=losses, acc=acc)
             print(msg)
 
-            # writer = writer_dict['writer']
-            # global_steps = writer_dict['train_global_steps']
-            # writer.add_scalar('train_loss', losses.val, global_steps)
-            # writer.add_scalar('train_acc', acc.val, global_steps)
-            # writer_dict['train_global_steps'] = global_steps + 1
-
-            prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
-            # save_debug_images(config, input, meta, target, pred*4, output,
-            #                   prefix)
+            prefix = '{}_{}'.format(os.path.join(debug_dir, 'train'), i)
+            save_debug_images(input, meta, target, pred*4, output, prefix)
 
 
-def validate(val_loader, val_dataset, model, criterion, output_dir, print_freq=20):
+def validate(val_loader, val_dataset, model, criterion, debug_dir, print_freq):
     batch_time = AverageMeter()
     losses = AverageMeter()
     acc = AverageMeter()
 
     # switch to evaluate mode
     model.eval()
+    n = len(val_loader)
 
     num_samples = len(val_dataset)
     all_preds = np.zeros(
-        (num_samples, 16, 3),
+        (num_samples, val_dataset.num_joints, 3),
         dtype=np.float32
     )
 
@@ -179,7 +172,7 @@ def validate(val_loader, val_dataset, model, criterion, output_dir, print_freq=2
 
             idx += num_images
 
-            if i % print_freq == 0:
+            if i % print_freq == 0 or i == n - 1:
                 msg = 'Test: [{0}/{1}]\t' \
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t' \
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t' \
@@ -189,13 +182,12 @@ def validate(val_loader, val_dataset, model, criterion, output_dir, print_freq=2
                 logger.info(msg)
 
                 prefix = '{}_{}'.format(
-                    os.path.join(output_dir, 'val'), i
+                    os.path.join(debug_dir, 'val'), i
                 )
-                # save_debug_images(config, input, meta, target, pred*4, output,
-                #                   prefix)
+                save_debug_images(input, meta, target, pred*4, output, prefix)
 
         name_values, perf_indicator = val_dataset.evaluate(
-            all_preds, output_dir, all_boxes, image_path,
+            all_preds, debug_dir, all_boxes, image_path,
             filenames, imgnums
         )
         print(name_values)
@@ -207,34 +199,6 @@ def validate(val_loader, val_dataset, model, criterion, output_dir, print_freq=2
                 _print_name_value(name_value, model_name)
         else:
             _print_name_value(name_values, model_name)
-
-        # if writer_dict:
-        #     writer = writer_dict['writer']
-        #     global_steps = writer_dict['valid_global_steps']
-        #     writer.add_scalar(
-        #         'valid_loss',
-        #         losses.avg,
-        #         global_steps
-        #     )
-        #     writer.add_scalar(
-        #         'valid_acc',
-        #         acc.avg,
-        #         global_steps
-        #     )
-        #     if isinstance(name_values, list):
-        #         for name_value in name_values:
-        #             writer.add_scalars(
-        #                 'valid',
-        #                 dict(name_value),
-        #                 global_steps
-        #             )
-        #     else:
-        #         writer.add_scalars(
-        #             'valid',
-        #             dict(name_values),
-        #             global_steps
-        #         )
-        #     writer_dict['valid_global_steps'] = global_steps + 1
 
     return perf_indicator
 

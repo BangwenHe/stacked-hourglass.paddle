@@ -10,12 +10,15 @@ from lib.dataset.mpii import MPIIDataset
 from lib.models.loss import JointsMSELoss
 from lib.core.function import train, validate
 from lib.config import cfg
-from lib.utils.utils import get_optimizer, save_checkpoint
+from lib.utils.utils import get_optimizer, save_checkpoint, model_parameters
 
 
 def main():
-    model = Hourglass()
-    cfg.set_args(gpu_ids='3')
+    cfg.set_args()
+    cfg.prepare_output_directories()
+    cfg.print_configurations()
+
+    model = Hourglass(num_modules=cfg.num_stacked_modules)
 
     criterion = JointsMSELoss(use_target_weight=False)
     transform = _transform.Compose([
@@ -34,13 +37,18 @@ def main():
     optim = get_optimizer(cfg, model)
     scheduler = paddle.optimizer.lr.MultiStepDecay(learning_rate=lr, milestones=cfg.decay_epoch, gamma=cfg.decay_gamma)
     model.init_weight()
-    # model.load_dict(paddle.load('output/best.pdparams'))
-    print('loaded checkpoint!')
+    if cfg.continue_train and os.path.exists(cfg.checkpoint_path):
+        ckpt = paddle.load(cfg.checkpoint_path)
+        cfg.start_epoch = ckpt['epoch']
+        model.load_dict(ckpt['state_dict'])
+        print(f'loaded model state dict from {cfg.checkpoint_path}')
+
+    model_parameters(model)
 
     best_perf = 0
     for i in range(cfg.start_epoch, cfg.end_epoch):
-        train(train_loader, model, criterion, optim, i, 'output', print_freq=20)
-        perf = validate(valid_loader, valid_dataset, model, criterion, 'output', print_freq=1)
+        train(train_loader, model, criterion, optim, i, cfg.vis_dir, cfg.train_print_freq)
+        perf = validate(valid_loader, valid_dataset, model, criterion, cfg.vis_dir, cfg.test_print_freq)
         scheduler.step()
 
         ckpt = {
