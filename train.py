@@ -39,7 +39,14 @@ def main(num_epochs=200):
         perf = validate(valid_loader, valid_dataset, model, criterion, 'output', print_freq=1)
         scheduler.step()
 
-        paddle.save(model.state_dict(), f'output/hg-{i}.pdparams')
+        paddle.save(
+            {
+                'state_dict': model.state_dict(),
+                'epoch': i,
+                'optimizer': optim.state_dict()
+            },
+            'checkpoint.pdparams'
+        )
         if perf > best_perf:
             paddle.save(model.state_dict(), f'output/best.pdparams')
             best_perf = perf
