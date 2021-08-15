@@ -1,0 +1,7 @@
+numpy~=1.19.2
+setuptools~=52.0.0.post20210125
+Cython~=0.29.24
+opencv-python~=4.5.3.56
+scipy~=1.7.1
+paddle~=2.1.2
+paddleslim
