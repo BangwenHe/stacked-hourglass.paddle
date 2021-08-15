@@ -30,8 +30,8 @@ def main():
     valid_dataset = MPIIDataset(root=cfg.dataset_dir, image_set='valid', is_train=False, transform=transform)
     train_loader = paddle.io.DataLoader(dataset=train_dataset, batch_size=cfg.train_batch_size,
                                         num_workers=cfg.train_workers)
-    valid_loader = paddle.io.DataLoader(dataset=valid_dataset, batch_size=cfg.test_batch_size,
-                                        num_workers=cfg.test_workers)
+    valid_loader = paddle.io.DataLoader(dataset=valid_dataset, batch_size=cfg.valid_batch_size,
+                                        num_workers=cfg.valid_workers)
 
     lr = cfg.lr
     optim = get_optimizer(cfg, model)
@@ -48,7 +48,7 @@ def main():
     best_perf = 0
     for i in range(cfg.start_epoch, cfg.end_epoch):
         train(train_loader, model, criterion, optim, i, cfg.vis_dir, cfg.train_print_freq)
-        perf = validate(valid_loader, valid_dataset, model, criterion, cfg.vis_dir, cfg.test_print_freq)
+        perf = validate(valid_loader, valid_dataset, model, criterion, cfg.vis_dir, cfg.valid_print_freq)
         scheduler.step()
 
         ckpt = {

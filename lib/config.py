@@ -43,10 +43,10 @@ class Config:
     alpha = 0.99
     epsilon = 1e-8
 
-    ## testing config
-    test_batch_size = 4
-    test_workers = 4
-    test_print_freq = 10
+    ## validing config
+    valid_batch_size = 4
+    valid_workers = 4
+    valid_print_freq = 100
 
     ## directory
     cur_dir = osp.dirname(os.path.abspath(__file__))

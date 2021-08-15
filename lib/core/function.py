@@ -179,7 +179,7 @@ def validate(val_loader, val_dataset, model, criterion, debug_dir, print_freq):
                       'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
                           i, len(val_loader), batch_time=batch_time,
                           loss=losses, acc=acc)
-                logger.info(msg)
+                print(msg)
 
                 prefix = '{}_{}'.format(
                     os.path.join(debug_dir, 'val'), i
