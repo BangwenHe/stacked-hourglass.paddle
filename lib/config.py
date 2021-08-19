@@ -48,7 +48,6 @@ class Config:
     decay_gamma = 0.9
 
     ### RMSProp parameters
-    learning_rate_decay = 0
     momentum = 0
     weight_decay = 0
     alpha = 0.99
