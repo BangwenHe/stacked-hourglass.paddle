@@ -23,7 +23,7 @@ class Config:
     flip_factor = 0.5
     rotation_factor = 30
     # coco数据集需要设置, mpii数据集不需要设置
-    prob_alf_body = -1
+    prob_half_body = -1
     color_rgb = True
     target_type = 'gaussian'
     use_different_joints_weight = False
@@ -37,7 +37,7 @@ class Config:
     num_channels = 256
 
     ## training config
-    train_batch_size = 26
+    train_batch_size = 16
     train_workers = 4
     start_epoch = 0
     end_epoch = 200
@@ -68,6 +68,8 @@ class Config:
     vis_dir = osp.join(output_dir, 'vis')
     log_dir = osp.join(output_dir, 'log')
     result_dir = osp.join(output_dir, 'result')
+    log_filename = 'log.txt'
+    cfg_filename = 'config.txt'
 
     ## debug
     save_batch_images_gt = True
@@ -100,18 +102,22 @@ class Config:
         self.log_dir = osp.join(self.output_dir, 'log')
         self.result_dir = osp.join(self.output_dir, 'result')
 
-    def prepare_output_directories(self):
         dirs = [self.output_dir, self.model_dir, self.vis_dir, self.log_dir, self.result_dir]
         for d in dirs:
             os.makedirs(d)
 
-    def print_configurations(self):
+        with open(osp.join(self.log_dir, self.cfg_filename), 'w') as f:
+            lines = self._print_configurations()
+            f.write('\n'.join(lines))
+
+    def _print_configurations(self):
         params = [i for i in dir(self) if re.match(r'^__.*__$', i) is None and not hasattr(self.__getattribute__(i), '__call__')]
+        lines = []
         for p in params:
-            print(f'{p}: {self.__getattribute__(p)}')
+            line = f'{p}: {self.__getattribute__(p)}'
+            print(line)
+            lines.append(line)
+        return lines
 
 
 cfg = Config()
-
-if __name__ == '__main__':
-    cfg.print_configurations()

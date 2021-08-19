@@ -12,10 +12,8 @@ from pathlib import Path
 
 import paddle
 
-from lib.config import Config
 
-
-def get_optimizer(cfg: Config, model:paddle.nn.Layer):
+def get_optimizer(cfg, model:paddle.nn.Layer):
     if cfg.optimizer == 'adam':
         optimizer = paddle.optimizer.Adam(
             parameters=model.parameters(),

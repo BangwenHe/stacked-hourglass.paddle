@@ -31,8 +31,6 @@ def arg_parser():
 def main():
     args = arg_parser()
     cfg.set_args(args)
-    cfg.prepare_output_directories()
-    cfg.print_configurations()
 
     model = Hourglass(
         num_modules=cfg.num_stacked_modules,
