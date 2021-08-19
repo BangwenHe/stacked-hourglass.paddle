@@ -4,10 +4,6 @@
 # Written by Bin Xiao (Bin.Xiao@microsoft.com)
 # ------------------------------------------------------------------------------
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import logging
 import os
 import json
@@ -18,19 +14,14 @@ import paddle.vision.transforms
 from scipy.io import loadmat, savemat
 
 from lib.dataset.JointsDataset import JointsDataset
-
+from lib.config import Config
 
 logger = logging.getLogger(__name__)
 
 
 class MPIIDataset(JointsDataset):
-    def __init__(self, root, image_set, is_train, transform=None, output_path='output', data_format='jpg',
-                 scale_factor=0.25, rotation_factor=30, flip=True, num_joints_half_body=8, prob_half_body=-1,
-                 color_rgb=True, target_type='gaussian', image_size=256, heatmap_size=64, sigma=2,
-                 use_different_joints_weight=False, select_train_data=False, test_set='valid'):
-        super().__init__(root, image_set, is_train, transform, output_path, data_format, scale_factor, rotation_factor,
-                         flip, num_joints_half_body, prob_half_body, color_rgb, target_type, image_size, heatmap_size,
-                         sigma, use_different_joints_weight)
+    def __init__(self, cfg:Config, root, image_set, is_train, transform=None):
+        super().__init__(cfg, root, image_set, is_train, transform)
 
         self.num_joints = 16
         self.flip_pairs = [[0, 5], [1, 4], [2, 3], [10, 15], [11, 14], [12, 13]]
@@ -40,8 +31,8 @@ class MPIIDataset(JointsDataset):
         self.lower_body_ids = (0, 1, 2, 3, 4, 5, 6)
 
         self.db = self._get_db()
-        self.select_train_data = select_train_data
-        self.test_set = test_set
+        self.select_train_data = cfg.select_train_data
+        self.test_set = cfg.test_set
 
         if is_train and self.select_train_data:
             self.db = self.select_data(self.db)

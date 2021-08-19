@@ -4,10 +4,6 @@
 # Written by Bin Xiao (Bin.Xiao@microsoft.com)
 # ------------------------------------------------------------------------------
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import copy
 import logging
 import random
@@ -16,63 +12,74 @@ import cv2
 import numpy as np
 import paddle
 from paddle.io import Dataset
+import paddle.vision.transforms as _transforms
 
 from lib.utils.transforms import get_affine_transform
 from lib.utils.transforms import affine_transform
 from lib.utils.transforms import fliplr_joints
+from lib.config import Config
 
 
 logger = logging.getLogger(__name__)
 
 
 class JointsDataset(Dataset):
-    def __init__(self,
-                 root,
-                 image_set,
-                 is_train,
-                 transform=None,
-                 output_path='output',
-                 data_format='jpg',
-                 scale_factor=0.25,
-                 rotation_factor=30,
-                 flip=True,
-                 num_joints_half_body=8,
-                 prob_half_body=-1,
-                 color_rgb=True,
-                 target_type='gaussian',
-                 image_size=256,
-                 heatmap_size=64,
-                 sigma=2,
-                 use_different_joints_weight=False,
-                 ):
+    def __init__(self, cfg: Config, root, image_set, is_train, transform=None):
         super().__init__()
+        # 关键点数量
         self.num_joints = 0
+        # 缩放的基准大小200像素
         self.pixel_std = 200
+        # 对称的关键点
         self.flip_pairs = []
+        # 对应索引的关键点的父关键点id
         self.parent_ids = []
 
+        # 是否训练(开启数据增强)
         self.is_train = is_train
+        # 数据集路径
         self.root = root
+        # train, valid, test etc.
         self.image_set = image_set
 
-        self.output_path = output_path
-        self.data_format = data_format
+        # 图像文件格式(jpg, png etc.)
+        self.data_format = cfg.data_format
 
-        self.scale_factor = scale_factor
-        self.rotation_factor = rotation_factor
-        self.flip = flip
-        self.num_joints_half_body = num_joints_half_body
-        self.prob_half_body = prob_half_body
-        self.color_rgb = color_rgb
+        # 缩放尺度
+        self.scale_factor = cfg.scale_factor
+        # 旋转尺度
+        self.rotation_factor = cfg.rotation_factor
+        # 翻转概率
+        self.flip_factor = cfg.flip_factor
+        # 半身的关键点数量
+        self.num_joints_half_body = cfg.num_joints // 2
+        # 出现半身的概率
+        self.prob_half_body = cfg.prob_half_body
+        # 是否为RGB
+        self.color_rgb = cfg.color_rgb
 
-        self.target_type = target_type
-        self.image_size = np.array([image_size, image_size]) if type(image_size) == int else image_size
-        self.heatmap_size = np.array([heatmap_size, heatmap_size]) if type(heatmap_size) == int else heatmap_size
-        self.sigma = sigma
-        self.use_different_joints_weight = use_different_joints_weight
+        # 目标heatmap的格式(现为高斯分布)
+        self.target_type = cfg.target_type
+        # 图像大小
+        self.image_size = np.array(cfg.input_img_shape)
+        # heatmap大小
+        self.heatmap_size = np.array(cfg.output_hm_shape)
+        # 高斯分布的sigma参数
+        self.sigma = cfg.sigma
+        # 是否对不同的关键点使用不同的关键点权重
+        self.use_different_joints_weight = cfg.use_different_joints_weight
         self.joints_weight = 1
 
-        self.transform = transform
+        # 图像转换
+        if transform is not None:
+            self.transform = transform
+        else:
+            self.transform = _transforms.Compose([
+                _transforms.ToTensor(),
+                _transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+
+        # database
         self.db = []
 
     def _get_db(self):
@@ -177,7 +184,7 @@ class JointsDataset(Dataset):
             r = np.clip(np.random.randn()*rf, -rf*2, rf*2) \
                 if random.random() <= 0.6 else 0
 
-            if self.flip and random.random() <= 0.5:
+            if random.random() <= self.flip_factor:
                 data_numpy = data_numpy[:, ::-1, :]
                 joints, joints_vis = fliplr_joints(
                     joints, joints_vis, data_numpy.shape[1], self.flip_pairs)

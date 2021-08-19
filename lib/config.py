@@ -8,8 +8,8 @@ import numpy as np
 
 class Config:
     ## dataset
-    dataset_name = 'MPII'
-    dataset_dir = '/home/tclab/Dataset/MPII'
+    dataset_name = 'mpii'
+    dataset_dir = 'dataset/mpii'
     num_joints = 16
     data_format = 'jpg'
 
@@ -19,11 +19,20 @@ class Config:
 
     scale_factor = 0.25
     flip_factor = 0.5
-    rotation_factor = 0.5
+    rotation_factor = 30
+    # coco数据集需要设置, mpii数据集不需要设置
+    prob_alf_body = -1
+    color_rgb = True
+    target_type = 'gaussian'
+    use_different_joints_weight = False
+
+    select_train_data = False
+    test_set = 'valid'
 
     ## model
     model_name = 'hourglass'
-    num_stacked_modules = 4
+    num_stacked_modules = 8
+    num_channels = 256
 
     ## training config
     train_batch_size = 26
@@ -71,13 +80,13 @@ class Config:
     best_model_path = os.path.join(model_dir, 'best.pdparams')
     checkpoint_path = os.path.join(model_dir, 'checkpoint.pdparams')
 
-    def set_args(self, gpu_ids=None, continue_train=None):
-        if gpu_ids is not None:
-            self.gpu_ids = gpu_ids
+    def set_args(self, args):
         self.num_gpus = len(self.gpu_ids.split(','))
 
-        if continue_train is not None:
-            self.continue_train = continue_train
+        self.dataset_name = args.dataset_name
+        self.data_dir = args.dataset_dir
+        self.num_stacked_modules = args.num_stacked_modules
+        self.continue_train = args.continue_train
 
         os.environ["CUDA_VISIBLE_DEVICES"] = self.gpu_ids
         print('>>> Using GPU: {}'.format(self.gpu_ids))

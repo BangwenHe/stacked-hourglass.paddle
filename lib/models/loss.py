@@ -38,7 +38,7 @@ if __name__ == '__main__':
     hg = Hourglass()
     criterion = JointsMSELoss(False)
     optim = paddle.optimizer.Adam(learning_rate=1e-3, parameters=hg.parameters())
-    print(hg.down_sample[0].weight[0, 0])
+    print(hg.stem[0].weight[0, 0])
 
     y = hg(x)
     loss = criterion(y[0], label, 0)
@@ -46,4 +46,4 @@ if __name__ == '__main__':
     loss.backward()
     optim.step()
     optim.clear_grad()
-    print(hg.down_sample[0].weight[0, 0])
+    print(hg.stem[0].weight[0, 0])

@@ -13,6 +13,7 @@ class ResidualModule(nn.Layer):
     """
     def __init__(self, in_channels=256, out_channels=256):
         super().__init__()
+        self.relu = nn.ReLU()
         self.bn1 = nn.BatchNorm(num_channels=in_channels)
         self.conv1 = nn.Conv2D(in_channels=in_channels, out_channels=out_channels//2, kernel_size=1)
 
@@ -22,15 +23,24 @@ class ResidualModule(nn.Layer):
         self.bn3 = nn.BatchNorm(num_channels=out_channels//2)
         self.conv3 = nn.Conv2D(in_channels=out_channels//2, out_channels=out_channels, kernel_size=1)
 
-        self.conv_res = nn.Conv2D(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
+        # 当通道数一致时, 不需要执行卷积操作
+        if in_channels == out_channels:
+            self.conv_in_skip = False
+        else:
+            self.conv_in_skip = True
+        self.skip_layer = nn.Conv2D(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
 
     def forward(self, x):
         y = self.conv1(F.relu(self.bn1(x)))
         y = self.conv2(F.relu(self.bn2(y)))
         y = self.conv3(F.relu(self.bn3(y)))
 
-        x = self.conv_res(x)
-        return x + y
+        if self.conv_in_skip:
+            res = self.skip_layer(x)
+        else:
+            res = x
+
+        return res + y
 
 
 class HourglassModule(nn.Layer):
@@ -78,22 +88,18 @@ class HourglassModule(nn.Layer):
 
 
 class Hourglass(nn.Layer):
-    def __init__(self, num_modules=4, img_size=256, feat_size=64, num_channels=256, num_joints=16):
+    def __init__(self, num_modules=4, num_channels=256, num_joints=16):
         super().__init__()
 
         # 堆叠的hourglass模块的数量
         self.num_modules = num_modules
-        # 输入网络的图像尺寸
-        self.img_size = img_size
-        # 输入hourglass模块的图像尺寸
-        self.feat_size = feat_size
         # 输入hourglass模块的通道数
         self.num_channels = num_channels
         # 图片的通道数
         self.num_joints = num_joints
 
         # 对256的图像进行降采样
-        self.down_sample = nn.Sequential(
+        self.stem = nn.Sequential(
             nn.Conv2D(kernel_size=7, stride=2, padding=3, in_channels=3, out_channels=num_channels // 4),
             nn.BatchNorm(num_channels=num_channels // 4),
             nn.ReLU(),
@@ -103,46 +109,31 @@ class Hourglass(nn.Layer):
             ResidualModule(in_channels=num_channels // 2, out_channels=num_channels)
         )
 
-        self.hourglass_modules = nn.LayerList()
-        for i in range(self.num_modules):
-            module = nn.Sequential(
-                ('hourglass_module', HourglassModule()),
-                ('res', ResidualModule()),
-                ('conv', nn.Sequential(
-                    nn.Conv2D(kernel_size=1, in_channels=self.num_channels, out_channels=self.num_channels),
-                    nn.BatchNorm(num_channels=self.num_channels),
-                    nn.ReLU())),
-                ('remap_joints', nn.Conv2D(kernel_size=1, in_channels=self.num_channels, out_channels=self.num_joints)),
-                ('remap_channels_1', nn.Conv2D(kernel_size=1, in_channels=self.num_channels, out_channels=self.num_channels)),
-                ('remap_channels_2', nn.Conv2D(kernel_size=1, in_channels=self.num_joints, out_channels=self.num_channels))
-            )
+        # https://github.com/princeton-vl/pytorch_stacked_hourglass
+        self.hgs = nn.LayerList([HourglassModule(in_channels=self.num_channels) for _ in range(self.num_modules)])
+        self.features = nn.LayerList([nn.Sequential(
+            ResidualModule(in_channels=self.num_channels, out_channels=self.num_channels),
+            nn.Conv2D(kernel_size=1, in_channels=self.num_channels, out_channels=self.num_channels),
+            nn.BatchNorm(num_channels=self.num_channels),
+            nn.ReLU()
+        ) for _ in range(self.num_modules)])
+        self.predicts = nn.LayerList([nn.Conv2D(kernel_size=1, in_channels=self.num_channels, out_channels=self.num_joints) for _ in range(self.num_modules)])
 
-            self.hourglass_modules.append(module)
+        self.remap_features = nn.LayerList([nn.Conv2D(kernel_size=1, in_channels=self.num_channels, out_channels=self.num_channels) for _ in range(self.num_modules - 1)])
+        self.remap_preds = nn.LayerList([nn.Conv2D(kernel_size=1, in_channels=self.num_joints, out_channels=self.num_channels) for _ in range(self.num_modules - 1)])
 
     def forward(self, x):
-        x = self.down_sample(x)
+        x = self.stem(x)
         output = []
 
-        for idx, m in enumerate(self.hourglass_modules):
-            _hg = m['hourglass_module']
-            res = m['res']
-            conv = m['conv']
-            rj = m['remap_joints']
-            r1 = m['remap_channels_1']
-            r2 = m['remap_channels_2']
+        for i in range(self.num_modules):
+            hg = self.hgs[i](x)
+            feat = self.features[i](hg)
+            pred = self.predicts[i](feat)
+            output.append(pred)
 
-            y = _hg(x)
-            y = res(y)
-            y = conv(y)
-
-            out = rj(y)
-            output.append(out)
-
-            if idx < self.num_modules - 1:
-                y1 = r1(y)
-                y2 = r2(out)
-
-                x = x + y1 + y2
+            if i < self.num_modules - 1:
+                x = x + self.remap_features[i](feat) + self.remap_preds[i](pred)
 
         return output
 

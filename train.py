@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import argparse
 import paddle
-import paddle.vision.transforms as _transform
+import paddle.vision.transforms as _transforms
 
 from lib.models.hourglass import Hourglass
 from lib.dataset.mpii import MPIIDataset
@@ -13,21 +13,36 @@ from lib.config import cfg
 from lib.utils.utils import get_optimizer, save_checkpoint, model_parameters
 
 
+def arg_parser():
+    parser = argparse.ArgumentParser(description='Hourglass implemented via Paddlepaddle. Training console parameters. '
+                                                 'Others parameters can be found in lib/config.py')
+
+    parser.add_argument('--dataset_name', type=str, default='mpii', choices=['mpii'], help='training dataste name')
+    parser.add_argument('--dataset_dir', type=str, default='dataset/mpii', help='training dataset directory')
+    parser.add_argument('--num_stacked_modules', type=int, default=8, help='number of stacked hourglass modules')
+    parser.add_argument('--continue_train', type=bool, default=False, help='load checkpoint and continue training')
+
+    parser = parser.parse_args()
+
+    return parser
+
+
 def main():
-    cfg.set_args()
+    args = arg_parser()
+    cfg.set_args(args)
     cfg.prepare_output_directories()
     cfg.print_configurations()
 
-    model = Hourglass(num_modules=cfg.num_stacked_modules)
+    model = Hourglass(
+        num_modules=cfg.num_stacked_modules,
+        num_channels=cfg.num_channels,
+        num_joints=cfg.num_joints
+    )
 
     criterion = JointsMSELoss(use_target_weight=False)
-    transform = _transform.Compose([
-        _transform.ToTensor(),
-        _transform.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
 
-    train_dataset = MPIIDataset(root=cfg.dataset_dir, image_set='train', is_train=True, transform=transform)
-    valid_dataset = MPIIDataset(root=cfg.dataset_dir, image_set='valid', is_train=False, transform=transform)
+    train_dataset = MPIIDataset(cfg, root=cfg.dataset_dir, image_set='train', is_train=True)
+    valid_dataset = MPIIDataset(cfg, root=cfg.dataset_dir, image_set='valid', is_train=False)
     train_loader = paddle.io.DataLoader(dataset=train_dataset, batch_size=cfg.train_batch_size,
                                         num_workers=cfg.train_workers)
     valid_loader = paddle.io.DataLoader(dataset=valid_dataset, batch_size=cfg.valid_batch_size,
