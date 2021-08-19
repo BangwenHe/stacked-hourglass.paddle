@@ -5,6 +5,8 @@ import sys
 import math
 import numpy as np
 
+from lib.utils.utils import increment_path
+
 
 class Config:
     ## dataset
@@ -84,17 +86,24 @@ class Config:
         self.num_gpus = len(self.gpu_ids.split(','))
 
         self.dataset_name = args.dataset_name
-        self.data_dir = args.dataset_dir
+        self.dataset_dir = args.dataset_dir
         self.num_stacked_modules = args.num_stacked_modules
         self.continue_train = args.continue_train
 
         os.environ["CUDA_VISIBLE_DEVICES"] = self.gpu_ids
         print('>>> Using GPU: {}'.format(self.gpu_ids))
 
+        output_dir = args.output_dir
+        self.output_dir = increment_path(osp.join(output_dir, self.model_name, self.dataset_name))
+        self.model_dir = osp.join(self.output_dir, 'model_dump')
+        self.vis_dir = osp.join(self.output_dir, 'vis')
+        self.log_dir = osp.join(self.output_dir, 'log')
+        self.result_dir = osp.join(self.output_dir, 'result')
+
     def prepare_output_directories(self):
         dirs = [self.output_dir, self.model_dir, self.vis_dir, self.log_dir, self.result_dir]
         for d in dirs:
-            os.makedirs(d, exist_ok=True)
+            os.makedirs(d)
 
     def print_configurations(self):
         params = [i for i in dir(self) if re.match(r'^__.*__$', i) is None and not hasattr(self.__getattribute__(i), '__call__')]

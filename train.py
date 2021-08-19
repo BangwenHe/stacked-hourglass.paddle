@@ -19,6 +19,7 @@ def arg_parser():
 
     parser.add_argument('--dataset_name', type=str, default='mpii', choices=['mpii'], help='training dataste name')
     parser.add_argument('--dataset_dir', type=str, default='dataset/mpii', help='training dataset directory')
+    parser.add_argument('--output_dir', type=str, default='output', help='output directory')
     parser.add_argument('--num_stacked_modules', type=int, default=8, help='number of stacked hourglass modules')
     parser.add_argument('--continue_train', type=bool, default=False, help='load checkpoint and continue training')
 
