@@ -6,7 +6,7 @@ import paddle
 import paddle.vision.transforms as _transforms
 
 from lib.models.hourglass import Hourglass
-from lib.dataset.mpii import MPIIDataset
+from lib.dataset import mpii, coco
 from lib.models.loss import JointsMSELoss
 from lib.core.function import train, validate
 from lib.config import cfg
@@ -41,8 +41,8 @@ def main():
 
     criterion = JointsMSELoss(use_target_weight=False)
 
-    train_dataset = MPIIDataset(cfg, root=cfg.dataset_dir, image_set='train', is_train=True)
-    valid_dataset = MPIIDataset(cfg, root=cfg.dataset_dir, image_set='valid', is_train=False)
+    train_dataset = eval(cfg.dataset_name)(cfg, root=cfg.dataset_dir, image_set='train', is_train=True)
+    valid_dataset = eval(cfg.dataset_name)(cfg, root=cfg.dataset_dir, image_set='valid', is_train=False)
     train_loader = paddle.io.DataLoader(dataset=train_dataset, batch_size=cfg.train_batch_size,
                                         num_workers=cfg.train_workers)
     valid_loader = paddle.io.DataLoader(dataset=valid_dataset, batch_size=cfg.valid_batch_size,
